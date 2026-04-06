@@ -1,0 +1,4 @@
+interface:
+  display_name: "BYOCDN-Other Transform"
+  short_description: "Generate a log transform script for LLM Optimizer"
+  default_prompt: "Use $byocdn-other-transform to generate a script that converts my CDN logs to the BYOCDN-Other format."

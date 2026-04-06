@@ -1,0 +1,4 @@
+interface:
+  display_name: "BYOCDN-Other Upload"
+  short_description: "Generate an S3 upload script for LLM Optimizer"
+  default_prompt: "Use $byocdn-other-upload to generate a script that uploads my BYOCDN-Other logs to LLM Optimizer."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "BYOCDN-Other Onboard"
+  short_description: "Generate a complete LLM Optimizer log forwarding package"
+  default_prompt: "Use $byocdn-other-onboard to prepare a complete log forwarding setup package for my customer."
