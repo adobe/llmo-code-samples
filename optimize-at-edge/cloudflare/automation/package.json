@@ -1,0 +1,24 @@
+{
+  "name": "adobe-oae-worker",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Cloudflare Worker for Adobe Optimize at Edge — routes AI/LLM traffic to Adobe edge",
+  "main": "src/worker.js",
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "dev": "wrangler dev"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  },
+  "cloudflare": {
+    "bindings": {
+      "EDGE_OPTIMIZE_TARGET_HOST": {
+        "description": "Enter the Domain. Example: www.example.com"
+      },
+      "EDGE_OPTIMIZE_API_KEY": {
+        "description": "Paste the Adobe LLMO API key. This value will be stored as a secret."
+      }
+    }
+  }
+}
