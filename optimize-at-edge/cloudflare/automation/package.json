@@ -14,7 +14,7 @@
   "cloudflare": {
     "bindings": {
       "EDGE_OPTIMIZE_TARGET_HOST": {
-        "description": "Enter the hostname this Worker should route to. Example: www.example.com"
+        "description": "Enter the Domain. Example: www.example.com"
       },
       "EDGE_OPTIMIZE_API_KEY": {
         "description": "Paste the Adobe LLMO API key. This value will be stored as a secret."
