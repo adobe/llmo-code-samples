@@ -1,6 +1,8 @@
 name = "edge-optimize-router"
 main = "src/worker.js"
 compatibility_date = "2025-01-01"
+workers_dev = false
+preview_urls = false
 
 [observability]
 enabled = true
