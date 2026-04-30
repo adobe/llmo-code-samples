@@ -1,0 +1,15 @@
+{
+  "name": "llmo-cdn-log-consumer",
+  "main": "llmo-cdn-log-consumer.ts",
+  "compatibility_date": "2026-04-29",
+  "queues": {
+    "consumers": [
+      {
+        "queue": "llmo-cdn-log-queue",
+        "max_batch_size": 100,
+        "max_batch_timeout": 60,
+        "max_retries": 3
+      }
+    ]
+  }
+}
