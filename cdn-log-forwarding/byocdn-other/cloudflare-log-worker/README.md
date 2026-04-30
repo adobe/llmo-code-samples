@@ -101,7 +101,7 @@ npx wrangler secret put LLMO_CDN_LOG_S3_PATH_PREFIX --config wrangler.consumer.j
 
 ## Deploy The Producer
 
-Before deploying the producer, update the `routes` section in [wrangler.producer.jsonc](/Users/constantinpopa/code/llmo-code-samples/cdn-log-forwarding/byocdn-other/cloudflare-log-worker/wrangler.producer.jsonc):
+Before deploying the producer, update the `routes` section in `wrangler.producer.jsonc`:
 
 - replace `www.example.com/*` with the hostname or path you want to log
 - replace `example.com` with your Cloudflare zone name
