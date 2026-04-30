@@ -63,18 +63,24 @@ function buildS3Key(pathPrefix: string, timestamp: string): string {
   return `${normalizedPrefix}/${year}/${month}/${day}/${Date.now()}-${crypto.randomUUID()}.jsonl`;
 }
 
-function groupEventsByUtcDay(events: LlmoCdnLogEvent[]): Map<string, LlmoCdnLogEvent[]> {
-  const groupedEvents = new Map<string, LlmoCdnLogEvent[]>();
+type ValidQueueMessage = Message<LlmoCdnLogEvent>;
 
-  for (const event of events) {
-    const { year, month, day } = getUtcDateParts(event.timestamp);
-    const dayKey = `${year}-${month}-${day}`;
-    const existingEvents = groupedEvents.get(dayKey) ?? [];
-    existingEvents.push(event);
-    groupedEvents.set(dayKey, existingEvents);
+function getUtcDayKey(timestamp: string): string {
+  const { year, month, day } = getUtcDateParts(timestamp);
+  return `${year}-${month}-${day}`;
+}
+
+function groupMessagesByUtcDay(messages: ValidQueueMessage[]): Map<string, ValidQueueMessage[]> {
+  const groupedMessages = new Map<string, ValidQueueMessage[]>();
+
+  for (const message of messages) {
+    const dayKey = getUtcDayKey(message.body.timestamp);
+    const existingMessages = groupedMessages.get(dayKey) ?? [];
+    existingMessages.push(message);
+    groupedMessages.set(dayKey, existingMessages);
   }
 
-  return groupedEvents;
+  return groupedMessages;
 }
 
 export default {
@@ -88,16 +94,28 @@ export default {
       secretAccessKey: env.LLMO_CDN_LOG_AWS_SECRET_KEY,
     });
 
-    const events = batch.messages.map((message) => {
+    const validMessages: ValidQueueMessage[] = [];
+
+    for (const message of batch.messages) {
       if (!isLlmoCdnLogEvent(message.body)) {
-        throw new Error("Queue message body does not match the expected LLMO CDN log schema.");
+        console.error("Queue message body does not match the expected LLMO CDN log schema.", {
+          messageId: message.id,
+        });
+        message.ack();
+        continue;
       }
 
-      return message.body;
-    });
-    const groupedEvents = groupEventsByUtcDay(events);
+      validMessages.push(message as ValidQueueMessage);
+    }
 
-    for (const dayEvents of groupedEvents.values()) {
+    if (validMessages.length === 0) {
+      return;
+    }
+
+    const groupedMessages = groupMessagesByUtcDay(validMessages);
+
+    for (const dayMessages of groupedMessages.values()) {
+      const dayEvents = dayMessages.map((message) => message.body);
       const body = dayEvents.map((event) => JSON.stringify(event)).join("\n") + "\n";
       const key = buildS3Key(env.LLMO_CDN_LOG_S3_PATH_PREFIX, dayEvents[0].timestamp);
       const s3Url = `https://${env.LLMO_CDN_LOG_S3_BUCKET}.s3.${env.LLMO_CDN_LOG_AWS_REGION}.amazonaws.com/${key}`;
@@ -114,11 +132,23 @@ export default {
         },
       });
 
-      if (!response.ok) {
-        throw new Error(`S3 upload failed: ${response.status} ${await response.text()}`);
+      if (response.ok) {
+        for (const message of dayMessages) {
+          message.ack();
+        }
+
+        continue;
+      }
+
+      console.error("S3 upload failed for queue day group.", {
+        status: response.status,
+        dayKey: getUtcDayKey(dayEvents[0].timestamp),
+        responseText: await response.text(),
+      });
+
+      for (const message of dayMessages) {
+        message.retry();
       }
     }
-
-    batch.ackAll();
   },
 } satisfies ExportedHandler<LlmoCdnLogConsumerEnv>;
