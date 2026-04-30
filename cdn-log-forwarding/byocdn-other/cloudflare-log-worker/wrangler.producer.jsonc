@@ -1,0 +1,19 @@
+{
+  "name": "llmo-cdn-log-producer",
+  "main": "llmo-cdn-log-producer.ts",
+  "compatibility_date": "2026-04-29",
+  "routes": [
+    {
+      "pattern": "www.example.com/*",
+      "zone_name": "example.com"
+    }
+  ],
+  "queues": {
+    "producers": [
+      {
+        "binding": "LLMO_CDN_LOG_QUEUE",
+        "queue": "llmo-cdn-log-queue"
+      }
+    ]
+  }
+}
