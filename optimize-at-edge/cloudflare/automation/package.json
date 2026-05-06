@@ -18,9 +18,6 @@
       },
       "EDGE_OPTIMIZE_API_KEY": {
         "description": "Your Adobe LLMO API key. This value will be stored as a secret."
-      },
-      "CLOUDFLARE_ZONE_ID": {
-        "description": "Zone ID for your domain. Find it in the Cloudflare Dashboard under your domain > Overview (right-hand panel). This value will be stored as a secret."
       }
     }
   }
