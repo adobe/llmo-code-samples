@@ -1,0 +1,94 @@
+name: Deploy — Cloudflare BYOCDN
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+defaults:
+  run:
+    working-directory: optimize-at-edge/cloudflare/automation
+
+jobs:
+  deploy:
+    name: Deploy Worker + wire route
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install
+
+      # Set the API key as a Cloudflare Worker secret so the Worker can read it at runtime.
+      - name: Set EDGE_OPTIMIZE_API_KEY secret
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          EDGE_OPTIMIZE_API_KEY: ${{ secrets.EDGE_OPTIMIZE_API_KEY }}
+        run: printf '%s' "$EDGE_OPTIMIZE_API_KEY" | npx wrangler secret put EDGE_OPTIMIZE_API_KEY
+
+      # Deploy the Worker. EDGE_OPTIMIZE_TARGET_HOST is passed as a var override
+      # so it uses the customer's domain rather than the placeholder in wrangler.toml.
+      - name: Deploy Worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          EDGE_OPTIMIZE_TARGET_HOST: ${{ secrets.EDGE_OPTIMIZE_TARGET_HOST }}
+        run: npx wrangler deploy --var "EDGE_OPTIMIZE_TARGET_HOST:${EDGE_OPTIMIZE_TARGET_HOST}"
+
+      # Wire the Worker route on the customer's zone via the Cloudflare API.
+      # Route pattern is auto-derived as <target-host>/* — catches all traffic on the domain.
+      # Idempotent: updates the existing route if it already exists, creates it if not.
+      # Required token permissions:
+      #   Account > Workers Scripts > Edit
+      #   Zone > Workers Routes > Edit   (for the customer's zone)
+      #   Zone > Zone > Read             (for the customer's zone)
+      - name: Wire Worker route
+        env:
+          CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CF_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
+          CF_TARGET_HOST: ${{ secrets.EDGE_OPTIMIZE_TARGET_HOST }}
+        run: |
+          python3 - <<'PYEOF'
+          import json, os, sys
+          import urllib.request, urllib.error
+
+          token    = os.environ['CF_TOKEN']
+          zone_id  = os.environ['CF_ZONE_ID']
+          pattern  = os.environ['CF_TARGET_HOST'] + '/*'
+          script   = 'edge-optimize-router'
+          base_url = f'https://api.cloudflare.com/client/v4/zones/{zone_id}/workers/routes'
+          headers  = {'Authorization': f'Bearer {token}', 'Content-Type': 'application/json'}
+
+          def cf(url, method='GET', payload=None):
+              data = json.dumps(payload).encode() if payload else None
+              req  = urllib.request.Request(url, data=data, method=method, headers=headers)
+              try:
+                  with urllib.request.urlopen(req) as resp:
+                      return json.loads(resp.read())
+              except urllib.error.HTTPError as e:
+                  return json.loads(e.read())
+
+          existing_routes = cf(base_url).get('result', [])
+          existing = next((r for r in existing_routes if r.get('pattern') == pattern), None)
+
+          if existing:
+              print(f"Route already exists (ID: {existing['id']}) — updating")
+              result = cf(f"{base_url}/{existing['id']}", method='PUT',
+                          payload={'pattern': pattern, 'script': script})
+          else:
+              print(f"Creating route: {pattern} -> {script}")
+              result = cf(base_url, method='POST',
+                          payload={'pattern': pattern, 'script': script})
+
+          if not result.get('success'):
+              print(f"Route wiring failed: {result.get('errors')}", file=sys.stderr)
+              sys.exit(1)
+
+          print(f"Done: {pattern} -> {script}")
+          PYEOF
