@@ -18,6 +18,12 @@
       },
       "EDGE_OPTIMIZE_API_KEY": {
         "description": "Paste the Adobe LLMO API key. This value will be stored as a secret."
+      },
+      "CF_ROUTE": {
+        "description": "Route pattern to attach the worker to. Example: www.example.com/*"
+      },
+      "CF_ZONE": {
+        "description": "Cloudflare zone name (your domain). Example: example.com"
       }
     }
   }
