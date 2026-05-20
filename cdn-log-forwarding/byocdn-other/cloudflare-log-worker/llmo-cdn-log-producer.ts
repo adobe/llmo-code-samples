@@ -22,8 +22,41 @@ type LlmoCdnLogEvent = {
   time_to_first_byte: number;
 };
 
+const ALLOWED_QUERY_PARAMS = new Set([
+  "utm_source",
+  "utm_medium",
+  "gclid",
+  "gclsrc",
+  "wbraid",
+  "gbraid",
+  "dclid",
+  "msclkid",
+  "fbclid",
+  "fbad_id",
+  "fbpxl_id",
+  "twclid",
+  "twsrc",
+  "twterm",
+  "li_fat_id",
+  "epik",
+  "ttclid",
+]);
+
 function toIso8601UtcSeconds(date: Date): string {
   return date.toISOString().replace(/\.\d{3}Z$/, "Z");
+}
+
+function buildSanitizedUrlPath(url: URL): string {
+  const filteredSearchParams = new URLSearchParams();
+
+  for (const [key, value] of url.searchParams) {
+    if (ALLOWED_QUERY_PARAMS.has(key.toLowerCase())) {
+      filteredSearchParams.append(key.toLowerCase(), value);
+    }
+  }
+
+  const filteredSearch = filteredSearchParams.toString();
+  return filteredSearch ? `${url.pathname}?${filteredSearch}` : url.pathname;
 }
 
 export default {
@@ -37,7 +70,7 @@ export default {
     const logEvent: LlmoCdnLogEvent = {
       timestamp: requestTimestamp,
       host: url.hostname,
-      url: `${url.pathname}${url.search}`,
+      url: buildSanitizedUrlPath(url),
       request_method: request.method.toUpperCase(),
       request_user_agent: request.headers.get("user-agent") ?? "",
       request_referer: request.headers.get("referer") ?? "",

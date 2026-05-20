@@ -15,6 +15,7 @@ The flow is:
 
 1. `llmo-cdn-log-producer` runs on the site traffic you want to log.
 2. The producer captures the required fields from the request and response.
+   The logged `url` keeps the path plus only a small allowlist of marketing attribution query parameters.
 3. The producer sends one log event to `llmo-cdn-log-queue`.
 4. `llmo-cdn-log-consumer` consumes queue batches.
 5. The consumer uploads newline-delimited JSON log files to the Adobe-provided S3 location.
@@ -36,6 +37,8 @@ Adobe LLM Optimizer expects one JSON object per line with these exact fields:
 Reference:
 
 - [Adobe LLM Optimizer: Log Forwarding - Other](https://experienceleague.adobe.com/en/docs/llm-optimizer/using/log-forwarding/other)
+
+The producer preserves only an internal allowlist of marketing attribution query-string parameters in the logged `url` field and strips all others.
 
 ## Install Dependencies
 
