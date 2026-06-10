@@ -171,7 +171,7 @@ Native Apache `Include` files for a reverse-proxy vhost — no worker or serverl
 </VirtualHost>
 ```
 
-See [`apache/README.md`](apache/README.md) and the [Apache BYOCDN guide](https://experienceleague.adobe.com/en/docs/llm-optimizer/using/resources/optimize-at-edge/apache-selfhosted-byocdn) for details.
+See the [Apache BYOCDN guide](https://experienceleague.adobe.com/en/docs/llm-optimizer/using/resources/optimize-at-edge/apache-selfhosted-byocdn) for the full step-by-step setup.
 
 ## Key Headers
 
