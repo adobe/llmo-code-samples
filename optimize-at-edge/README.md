@@ -147,6 +147,53 @@ cf.createRequestOriginGroup({
 });
 ```
 
+---
+
+### Apache HTTP Server (Self-Hosted)
+
+A set of Apache `Include` files for a reverse-proxy vhost — no worker or serverless function required. Routing, header injection, failover, and cache isolation are implemented entirely in native Apache directives (`mod_rewrite`, `mod_headers`, `mod_setenvif`, `mod_proxy`).
+
+#### Files
+
+| File | Purpose |
+|------|---------|
+| [`apache/oae/oae-routing.conf`](apache/oae/oae-routing.conf) | Bot detection, HTML-only filtering, header injection, loop protection, proxy routing to Edge Optimize, conditional `ErrorDocument` failover triggers, and `Vary`-based cache isolation. Include **inside** your `<VirtualHost>`, **before** your rewrite rules. |
+| [`apache/oae/oae-failover.conf`](apache/oae/oae-failover.conf) | Failover handler — when Edge Optimize returns a `4XX`/`5XX`, replays the original request against your origin. Include **inside** your `<VirtualHost>`, **after** your `ProxyPass`. |
+| [`apache/oae/domains.conf`](apache/oae/domains.conf) | Per-domain enablement and API keys. Uncomment one block per registered domain and fill in the Adobe-provided API key. |
+
+#### Required modules
+
+`proxy`, `proxy_http`, `ssl`, `rewrite`, `headers`, `env`, `setenvif` (most installs already load these).
+
+#### Setup
+
+1. Deploy the three files to a directory (for example, `conf/oae/`) on your Apache server.
+2. In your reverse-proxy vhost, add the two Includes:
+
+```apache
+<VirtualHost *:443>
+    ServerName www.example.com
+
+    # OAE routing — MUST be BEFORE your rewrite rules and ProxyPass.
+    Include "conf/oae/oae-routing.conf"
+
+    # --- your existing rewrite rules and ProxyPass to origin ---
+    ProxyPass        "/" "https://www.example.com/"
+    ProxyPassReverse "/" "https://www.example.com/"
+
+    # OAE failover — MUST be AFTER your ProxyPass.
+    Include "conf/oae/oae-failover.conf"
+</VirtualHost>
+```
+
+3. Enable your domain in `domains.conf` by uncommenting its block and setting the API key. Domains not listed safely route to origin.
+
+#### Cache isolation
+
+Bot and human responses are kept in separate cache entries via `Vary: x-edgeoptimize-config` (set by `oae-routing.conf`). If your Apache already uses `mod_cache`, ensure it has `CacheQuickHandler Off` so the cache lookup runs after the Edge Optimize headers are set. No separate cache configuration files are required.
+
+For the full step-by-step guide, see the [Apache HTTP Server / Self-Hosted BYOCDN guide](https://experienceleague.adobe.com/en/docs/llm-optimizer/using/resources/optimize-at-edge/apache-selfhosted-byocdn).
+
 ## Key Headers
 
 | Header | Direction | Description |
