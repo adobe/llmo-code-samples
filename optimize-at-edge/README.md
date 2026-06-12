@@ -150,6 +150,38 @@ cf.createRequestOriginGroup({
 });
 ```
 
+---
+
+### Apache HTTP Server (Self-Hosted)
+
+Native Apache `Include` files for a reverse-proxy vhost — no worker or serverless function. Routing, failover, and cache isolation are implemented with `mod_rewrite`, `mod_headers`, `mod_setenvif`, and `mod_proxy`.
+
+**Files:** [`apache/oae/`](apache/oae) — `oae-routing.conf` (routing, header injection, failover triggers, `Vary` cache isolation), `oae-failover.conf` (origin replay on EO error), and `domains.conf` (per-domain enablement + API keys).
+
+#### Setup
+
+1. Copy the three files to a directory (for example, `conf/oae/`); use the routing and failover files as-is.
+2. Enable your domain and set the API key in `domains.conf`.
+3. Add the two Includes to your vhost — routing **before** your Rewrite & `ProxyPass` rules, failover **after**. Lines marked `#NEWLINE` are the only lines you add for Optimize at Edge; everything else is your existing, unchanged configuration:
+
+```apache
+Define OAE_CONF_DIR conf/oae                       #NEWLINE  directory holding the OAE include files
+
+<VirtualHost *:443>
+    ServerName www.example.com
+
+    Include "${OAE_CONF_DIR}/oae-routing.conf"     #NEWLINE  OAE routing — BEFORE your Rewrite & ProxyPass rules
+
+    # --- your existing rewrite rules and ProxyPass to origin ---
+    ProxyPass        "/" "https://www.example.com/"
+    ProxyPassReverse "/" "https://www.example.com/"
+
+    Include "${OAE_CONF_DIR}/oae-failover.conf"    #NEWLINE  OAE failover — AFTER your ProxyPass rules
+</VirtualHost>
+```
+
+See the [Apache BYOCDN guide](https://experienceleague.adobe.com/en/docs/llm-optimizer/using/resources/optimize-at-edge/apache-selfhosted-byocdn) for the full step-by-step setup.
+
 ## Key Headers
 
 | Header | Direction | Description |
