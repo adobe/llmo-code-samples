@@ -162,15 +162,21 @@ Native Apache `Include` files for a reverse-proxy vhost — no worker or serverl
 
 1. Copy the three files to a directory (for example, `conf/oae/`); use the routing and failover files as-is.
 2. Enable your domain and set the API key in `domains.conf`.
-3. Add the two Includes to your vhost — routing **before** `ProxyPass`, failover **after**:
+3. Add the two Includes to your vhost — routing **before** your Rewrite & `ProxyPass` rules, failover **after**. Lines marked `#NEWLINE` are the only lines you add for Optimize at Edge; everything else is your existing, unchanged configuration:
 
 ```apache
+Define OAE_CONF_DIR conf/oae                       #NEWLINE  directory holding the OAE include files
+
 <VirtualHost *:443>
     ServerName www.example.com
-    Include "conf/oae/oae-routing.conf"
+
+    Include "${OAE_CONF_DIR}/oae-routing.conf"     #NEWLINE  OAE routing — BEFORE your Rewrite & ProxyPass rules
+
+    # --- your existing rewrite rules and ProxyPass to origin ---
     ProxyPass        "/" "https://www.example.com/"
     ProxyPassReverse "/" "https://www.example.com/"
-    Include "conf/oae/oae-failover.conf"
+
+    Include "${OAE_CONF_DIR}/oae-failover.conf"    #NEWLINE  OAE failover — AFTER your ProxyPass rules
 </VirtualHost>
 ```
 
