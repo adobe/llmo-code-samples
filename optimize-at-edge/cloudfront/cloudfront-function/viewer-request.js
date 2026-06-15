@@ -94,7 +94,7 @@ function handler(event) {
     // to Edge Optimize; all other hosts pass through unchanged.
     // ---------------------------------------------------------------
     var host = headers['host'] ? headers['host'].value.toLowerCase() : '';
-    var isOnboardedHost = ADOBE_EO_ONBOARDED_HOSTS === null ? true : ADOBE_EO_ONBOARDED_HOSTS.includes(host);
+    var isOnboardedHost = ADOBE_EO_ONBOARDED_HOSTS == null ? true : ADOBE_EO_ONBOARDED_HOSTS.includes(host);
  
     // ---------------------------------------------------------------
     // Routing decision:
