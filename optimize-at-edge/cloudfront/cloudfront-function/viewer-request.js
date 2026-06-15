@@ -48,6 +48,10 @@ function handler(event) {
     // ---------------------------------------------------------------
     var AGENTIC_BOTS = ['AdobeEdgeOptimize-AI', 'ChatGPT-User', 'GPTBot', 'OAI-SearchBot', 'PerplexityBot', 'Perplexity-User', 'ClaudeBot', 'Claude-User', 'Claude-SearchBot'];
     var TARGETED_PATHS = null;
+
+    // Multi-domain (optional): restrict routing to these hosts (lowercase).
+    // null = route every host. Example: ['www.domain-a.com', 'www.domain-b.com']
+    var ADOBE_EO_ONBOARDED_HOSTS = null;
  
     // ---------------------------------------------------------------
     // Extract the User-Agent header (lowercase for case-insensitive matching)
@@ -83,6 +87,14 @@ function handler(event) {
     var isAgenticBot = AGENTIC_BOTS.some(function(bot) {
         return userAgent.includes(bot.toLowerCase());
     });
+
+    // ---------------------------------------------------------------
+    // Multi-domain host gate: if ADOBE_EO_ONBOARDED_HOSTS is null,
+    // every host is allowed. Otherwise only the listed hosts route
+    // to Edge Optimize; all other hosts pass through unchanged.
+    // ---------------------------------------------------------------
+    var host = headers['host'] ? headers['host'].value.toLowerCase() : '';
+    var isOnboardedHost = ADOBE_EO_ONBOARDED_HOSTS === null ? true : ADOBE_EO_ONBOARDED_HOSTS.includes(host);
  
     // ---------------------------------------------------------------
     // Routing decision:
@@ -93,18 +105,19 @@ function handler(event) {
     //   3. Create an origin group that tries Edge Optimize first,
     //      with automatic failover to the default origin on errors
     // ---------------------------------------------------------------
-    if (!isEdgeOptimizeRequest && isAgenticBot && isTargetedPath) {
+    if (!isEdgeOptimizeRequest && isAgenticBot && isTargetedPath && isOnboardedHost) {
         // Pass the original URI to Edge Optimize so it knows which page to optimize
         request.headers['x-edgeoptimize-url'] = { value: request.uri };
  
         // Enable LLM client optimization mode
-        request.headers['x-edgeoptimize-config'] = { value: "LLMCLIENT=true" };
+        request.headers['x-edgeoptimize-config'] = { value: "LLMCLIENT=TRUE;" };
  
         console.log("Adding origin group for userAgent: " + userAgent);
  
         // Create an origin group: try EdgeOptimize_Origin first,
         // fall back to YOUR_DEFAULT_ORIGIN if Edge Optimize returns
         // any of the listed error status codes.
+        // If you reuse this function across distributions, set these origin IDs per domain.
         cf.createRequestOriginGroup({
             "originIds": [
                 { "originId": "EdgeOptimize_Origin" },
