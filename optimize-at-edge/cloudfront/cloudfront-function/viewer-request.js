@@ -48,6 +48,24 @@ function handler(event) {
     // ---------------------------------------------------------------
     var AGENTIC_BOTS = ['AdobeEdgeOptimize-AI', 'ChatGPT-User', 'GPTBot', 'OAI-SearchBot', 'PerplexityBot', 'Perplexity-User', 'ClaudeBot', 'Claude-User', 'Claude-SearchBot'];
     var TARGETED_PATHS = null;
+
+    // Multi-domain (optional): map each onboarded host (lowercase) to its
+    // CloudFront origin IDs. Use when ONE function is shared across distributions.
+    //   - null   => single domain: route every host using DEFAULT_*_ORIGIN_ID below.
+    //   - object => only the hosts listed as keys route to Edge Optimize; each
+    //               maps to that domain's { edgeOptimizeOriginId, defaultOriginId }.
+    //               All other hosts pass through unchanged.
+    // Example (multi-distribution):
+    //   var ADOBE_EO_ONBOARDED_HOSTS = {
+    //     'www.domain-a.com': { edgeOptimizeOriginId: 'EdgeOptimize_Origin_A', defaultOriginId: 'Default_Origin_A' },
+    //     'www.domain-b.com': { edgeOptimizeOriginId: 'EdgeOptimize_Origin_B', defaultOriginId: 'Default_Origin_B' }
+    //   };
+    var ADOBE_EO_ONBOARDED_HOSTS = null;
+
+    // Origin IDs for the single-domain case (ADOBE_EO_ONBOARDED_HOSTS = null).
+    // These must match the origin IDs configured on this distribution.
+    var DEFAULT_EDGE_OPTIMIZE_ORIGIN_ID = 'EdgeOptimize_Origin';
+    var DEFAULT_ORIGIN_ID = 'YOUR_DEFAULT_ORIGIN';
  
     // ---------------------------------------------------------------
     // Extract the User-Agent header (lowercase for case-insensitive matching)
@@ -83,6 +101,19 @@ function handler(event) {
     var isAgenticBot = AGENTIC_BOTS.some(function(bot) {
         return userAgent.includes(bot.toLowerCase());
     });
+
+    // Multi-domain host gate + per-host origin selection (see ADOBE_EO_ONBOARDED_HOSTS above).
+    // hostConfig is null when the host isn't onboarded, leaving isOnboardedHost false.
+    var host = headers['host'] ? headers['host'].value.toLowerCase() : '';
+    var hostConfig = (ADOBE_EO_ONBOARDED_HOSTS != null
+        && Object.prototype.hasOwnProperty.call(ADOBE_EO_ONBOARDED_HOSTS, host))
+        ? ADOBE_EO_ONBOARDED_HOSTS[host]
+        : null;
+    var isOnboardedHost = ADOBE_EO_ONBOARDED_HOSTS == null || hostConfig != null;
+    // Fall back to the defaults if a host entry omits either origin ID,
+    // so a partial config never passes an undefined originId to CloudFront.
+    var edgeOptimizeOriginId = (hostConfig && hostConfig.edgeOptimizeOriginId) || DEFAULT_EDGE_OPTIMIZE_ORIGIN_ID;
+    var defaultOriginId = (hostConfig && hostConfig.defaultOriginId) || DEFAULT_ORIGIN_ID;
  
     // ---------------------------------------------------------------
     // Routing decision:
@@ -93,22 +124,23 @@ function handler(event) {
     //   3. Create an origin group that tries Edge Optimize first,
     //      with automatic failover to the default origin on errors
     // ---------------------------------------------------------------
-    if (!isEdgeOptimizeRequest && isAgenticBot && isTargetedPath) {
+    if (!isEdgeOptimizeRequest && isAgenticBot && isTargetedPath && isOnboardedHost) {
         // Pass the original URI to Edge Optimize so it knows which page to optimize
         request.headers['x-edgeoptimize-url'] = { value: request.uri };
  
         // Enable LLM client optimization mode
-        request.headers['x-edgeoptimize-config'] = { value: "LLMCLIENT=true" };
+        request.headers['x-edgeoptimize-config'] = { value: "LLMCLIENT=TRUE;" };
  
         console.log("Adding origin group for userAgent: " + userAgent);
  
-        // Create an origin group: try EdgeOptimize_Origin first,
-        // fall back to YOUR_DEFAULT_ORIGIN if Edge Optimize returns
-        // any of the listed error status codes.
+        // Create an origin group: try this host's Edge Optimize origin first,
+        // and fall back to its default origin if Edge Optimize returns any of
+        // the listed error status codes. The origin IDs are resolved per host
+        // from ADOBE_EO_ONBOARDED_HOSTS (or DEFAULT_*_ORIGIN_ID for a single domain).
         cf.createRequestOriginGroup({
             "originIds": [
-                { "originId": "EdgeOptimize_Origin" },
-                { "originId": "YOUR_DEFAULT_ORIGIN" }
+                { "originId": edgeOptimizeOriginId },
+                { "originId": defaultOriginId }
             ],
             "failoverCriteria": {
                 "statusCodes": [400, 403, 404, 416, 500, 502, 503, 504]
