@@ -49,10 +49,8 @@ function handler(event) {
     var AGENTIC_BOTS = ['AdobeEdgeOptimize-AI', 'ChatGPT-User', 'GPTBot', 'OAI-SearchBot', 'PerplexityBot', 'Perplexity-User', 'ClaudeBot', 'Claude-User', 'Claude-SearchBot'];
     var TARGETED_PATHS = null;
 
-    // Multi-domain (optional): map each onboarded host (lowercase) to the
-    // CloudFront origin IDs for that domain. Use this when ONE viewer-request
-    // function is shared across multiple distributions, so each host routes to
-    // its own Edge Optimize and default origins.
+    // Multi-domain (optional): map each onboarded host (lowercase) to its
+    // CloudFront origin IDs. Use when ONE function is shared across distributions.
     //   - null   => single domain: route every host using DEFAULT_*_ORIGIN_ID below.
     //   - object => only the hosts listed as keys route to Edge Optimize; each
     //               maps to that domain's { edgeOptimizeOriginId, defaultOriginId }.
@@ -104,14 +102,8 @@ function handler(event) {
         return userAgent.includes(bot.toLowerCase());
     });
 
-    // ---------------------------------------------------------------
-    // Multi-domain host gate + per-host origin selection:
-    //   - ADOBE_EO_ONBOARDED_HOSTS null   => every host is onboarded and uses
-    //     the DEFAULT_*_ORIGIN_ID values (single-distribution setup).
-    //   - ADOBE_EO_ONBOARDED_HOSTS object => only hosts present as keys are
-    //     onboarded; each routes to its own origin IDs. Other hosts pass
-    //     through unchanged.
-    // ---------------------------------------------------------------
+    // Multi-domain host gate + per-host origin selection (see ADOBE_EO_ONBOARDED_HOSTS above).
+    // hostConfig is null when the host isn't onboarded, leaving isOnboardedHost false.
     var host = headers['host'] ? headers['host'].value.toLowerCase() : '';
     var hostConfig = (ADOBE_EO_ONBOARDED_HOSTS != null
         && Object.prototype.hasOwnProperty.call(ADOBE_EO_ONBOARDED_HOSTS, host))
