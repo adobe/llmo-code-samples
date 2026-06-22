@@ -4,8 +4,9 @@
   "private": true,
   "description": "Cloudflare Worker for Adobe Optimize at Edge — routes AI/LLM traffic to Adobe edge",
   "main": "src/worker.js",
+  "type": "module",
   "scripts": {
-    "deploy": "wrangler deploy",
+    "deploy": "node scripts/deploy.js",
     "dev": "wrangler dev"
   },
   "devDependencies": {
@@ -18,6 +19,12 @@
       },
       "EDGE_OPTIMIZE_API_KEY": {
         "description": "Paste the Adobe LLMO API key. This value will be stored as a secret."
+      },
+      "CF_ROUTE": {
+        "description": "Route pattern to attach the worker to. Example: www.example.com/*"
+      },
+      "CF_ZONE": {
+        "description": "Cloudflare zone name (your domain). Example: example.com"
       }
     }
   }

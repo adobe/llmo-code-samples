@@ -9,3 +9,5 @@ enabled = true
 
 [vars]
 EDGE_OPTIMIZE_TARGET_HOST = "www.example.com"
+CF_ROUTE = "www.example.com/*"
+CF_ZONE = "www.example.com"
