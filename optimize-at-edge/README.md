@@ -180,7 +180,7 @@ Define OAE_CONF_DIR conf/oae                       #NEWLINE  directory holding t
 </VirtualHost>
 ```
 
-See the [Apache BYOCDN guide](https://experienceleague.adobe.com/en/docs/llm-optimizer/using/resources/optimize-at-edge/apache-selfhosted-byocdn) for the full step-by-step setup.
+See the [Apache HTTP Server guide](https://experienceleague.adobe.com/en/docs/llm-optimizer/using/resources/optimize-at-edge/apache-http-server) for the full step-by-step setup.
 
 ## Key Headers
 
