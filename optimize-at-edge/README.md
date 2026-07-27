@@ -51,6 +51,86 @@ Both samples ship with the following default bot list (easily configurable):
 
 ## CDN Implementations
 
+### Vercel (Next.js)
+
+A two-file setup using **Edge Middleware** (detection + rewrite) and a **Next.js Edge API Route** (proxy + failover).
+
+**Files:**
+
+| File | Purpose |
+|------|---------|
+| [`vercel/middleware.js`](vercel/middleware.js) | Edge Middleware — detects agentic bots and rewrites requests to the proxy route. Works for both App Router and Pages Router. |
+| [`vercel/app/adobe-edgeoptimize/[[...path]]/route.js`](vercel/app/adobe-edgeoptimize/%5B%5B...path%5D%5D/route.js) | Proxy route for **App Router** (`app/` directory) |
+| [`vercel/pages-router/pages/api/adobe-edgeoptimize/[...path].js`](vercel/pages-router/pages/api/adobe-edgeoptimize/%5B...path%5D.js) | Proxy route for **Pages Router** (`pages/` directory) |
+
+#### Architecture
+
+```
+Edge Middleware (middleware.js)                         ← one file, works for both routers
+  → Detects agentic bots by User-Agent
+  → Rewrites /page → {PROXY_PATH_PREFIX}/page
+  → Sets x-edgeoptimize-url and x-edgeoptimize-config headers
+
+Proxy route (app/ or pages/api/)
+  → Adds x-forwarded-host and x-edgeoptimize-api-key headers
+  → Fetches from Edge Optimize origin
+  → On 4xx/5xx or network error, fails over to the default Vercel origin
+```
+
+#### Setup
+
+**Step 1 — Copy `middleware.js` to your project root** (same file for both routers):
+
+[`vercel/middleware.js`](vercel/middleware.js) → project root
+
+**Step 2 — Copy the proxy file that matches your router:**
+
+| If your project has… | Copy this file | To this path in your project |
+|----------------------|----------------|------------------------------|
+| `app/` directory (App Router) | [`vercel/app/adobe-edgeoptimize/[[...path]]/route.js`](vercel/app/adobe-edgeoptimize/%5B%5B...path%5D%5D/route.js) | `app/adobe-edgeoptimize/[[...path]]/route.js` |
+| `pages/` directory (Pages Router) | [`vercel/pages-router/pages/api/adobe-edgeoptimize/[...path].js`](vercel/pages-router/pages/api/adobe-edgeoptimize/%5B...path%5D.js) | `pages/api/adobe-edgeoptimize/[...path].js` |
+| Both `app/` and `pages/` | Use the App Router file above | `app/adobe-edgeoptimize/[[...path]]/route.js` |
+
+**Step 3 — Set `PROXY_PATH_PREFIX` in `middleware.js`:**
+
+```js
+// App Router (app/ directory) — default
+const PROXY_PATH_PREFIX = '/adobe-edgeoptimize';
+
+// Pages Router (pages/ directory) — change to:
+const PROXY_PATH_PREFIX = '/api/adobe-edgeoptimize';
+```
+
+> **Both routers:** Next.js allows `app/` and `pages/` to coexist (common during migration). Use the App Router proxy file and keep `PROXY_PATH_PREFIX = '/adobe-edgeoptimize'` — App Router routes take precedence and handle agentic traffic for all pages.
+
+#### Environment Variables
+
+Set these in your Vercel project (Dashboard → Settings → Environment Variables or via the Vercel CLI):
+
+| Variable | Description |
+|----------|-------------|
+| `EDGE_OPTIMIZE_API_KEY` | Your Adobe-provided API key |
+| `EDGE_OPTIMIZE_X_FORWARDED_HOST` | Your site's hostname (e.g. `www.yoursite.com`) |
+| `EDGE_OPTIMIZE_ORIGIN` | Edge Optimize backend URL (default: `https://live.edgeoptimize.net`) |
+
+Redeploy your Vercel project after setting environment variables.
+
+#### Configuration
+
+Edit the constants at the top of `middleware.js`:
+
+```js
+// Add or remove bot user agents
+const AGENTIC_BOTS = ['ChatGPT-User', 'GPTBot', ...];
+
+// Set to null to route all HTML pages, or specify an array of paths
+const TARGETED_PATHS = null; // e.g., ['/', '/products', '/about']
+```
+
+> **Requirements:** Next.js 14+, Node.js 18+, Vercel deployment.
+
+---
+
 ### Cloudflare Workers
 
 A single Cloudflare Worker that handles routing, failover, and loop protection.
