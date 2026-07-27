@@ -1,0 +1,60 @@
+name: Deploy — Cloudflare BYOCDN
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+defaults:
+  run:
+    working-directory: optimize-at-edge/cloudflare/automation
+
+jobs:
+  deploy:
+    name: Deploy Worker + wire route
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install
+
+      # Set the API key as a Cloudflare Worker secret so the Worker can read it at runtime.
+      - name: Set EDGE_OPTIMIZE_API_KEY secret
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          EDGE_OPTIMIZE_API_KEY: ${{ secrets.EDGE_OPTIMIZE_API_KEY }}
+        run: printf '%s' "$EDGE_OPTIMIZE_API_KEY" | npx wrangler secret put EDGE_OPTIMIZE_API_KEY
+
+      # Append the customer's route to wrangler.toml so that wrangler deploy wires it
+      # natively via the Cloudflare Routes API. Zone name is derived from the target host
+      # by stripping the first subdomain label (e.g. www.example.com → example.com).
+      # Note: this derivation works for single-level subdomains (www, shop, etc.).
+      # For deeper subdomains or ccTLDs, update zone_name manually after first deploy.
+      - name: Inject customer route into wrangler.toml
+        env:
+          TARGET_HOST: ${{ secrets.EDGE_OPTIMIZE_TARGET_HOST }}
+        run: |
+          ZONE_NAME=$(echo "$TARGET_HOST" | sed 's/^[^.]*\.//')
+          printf '\n[[routes]]\npattern = "%s/*"\nzone_name = "%s"\n' \
+            "$TARGET_HOST" "$ZONE_NAME" >> wrangler.toml
+          echo "Route to wire: $TARGET_HOST/* -> zone $ZONE_NAME"
+
+      # Deploy the Worker. wrangler reads the injected route from wrangler.toml and
+      # creates/updates it on the customer's zone automatically.
+      # Required token permissions:
+      #   Account > Workers Scripts > Edit
+      #   Zone > Workers Routes > Edit   (for the customer's zone)
+      #   Zone > Zone > Read             (for the customer's zone)
+      - name: Deploy Worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          EDGE_OPTIMIZE_TARGET_HOST: ${{ secrets.EDGE_OPTIMIZE_TARGET_HOST }}
+        run: npx wrangler deploy --var "EDGE_OPTIMIZE_TARGET_HOST:${EDGE_OPTIMIZE_TARGET_HOST}"
