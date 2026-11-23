@@ -83,6 +83,9 @@ function handler(event) {
     var isAgenticBot = AGENTIC_BOTS.some(function(bot) {
         return userAgent.includes(bot.toLowerCase());
     });
+    var hasSignatureHeader = !!((headers['signature-agent'] && headers['signature-agent'].value)
+        || (headers['signature-input'] && headers['signature-input'].value)
+        || (headers['signature'] && headers['signature'].value));
  
     // ---------------------------------------------------------------
     // Routing decision:
@@ -93,7 +96,7 @@ function handler(event) {
     //   3. Create an origin group that tries Edge Optimize first,
     //      with automatic failover to the default origin on errors
     // ---------------------------------------------------------------
-    if (!isEdgeOptimizeRequest && isAgenticBot && isTargetedPath) {
+    if (!isEdgeOptimizeRequest && (isAgenticBot || hasSignatureHeader) && isTargetedPath) {
         // Pass the original URI to Edge Optimize so it knows which page to optimize
         request.headers['x-edgeoptimize-url'] = { value: request.uri };
  

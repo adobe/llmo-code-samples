@@ -28,10 +28,12 @@ Adobe Edge Optimize improves how AI-powered agents and LLM bots consume your web
 ```
 
 1. An edge worker intercepts every incoming request.
-2. The **User-Agent** header is checked against a configurable list of known agentic bots.
-3. **Agentic bots** are routed to the Edge Optimize backend (`live.edgeoptimize.net`).
+2. The **User-Agent** header is checked against a configurable list of known agentic bots. A non-empty **Signature-Agent**, **Signature-Input**, or **Signature** header also qualifies the request as an agent candidate.
+3. **Agent candidates** are routed to the Edge Optimize backend (`live.edgeoptimize.net`), subject to the existing page/path, enabled-domain (Apache), and loop-protection restrictions.
 4. **All other traffic** passes through to your origin unchanged.
 5. If Edge Optimize returns an error, the request **fails over** to your origin automatically.
+
+Signature-header detection is an unverified routing signal, not cryptographic validation or proof of identity. Values are not parsed, trimmed, or rewritten by detection; each platform's native ingress normalization still applies. CloudFront forwarding remains subject to your existing distribution policies; these samples do not expand forwarding or cache policies. Lambda@Edge continues to follow the viewer function's routing marker.
 
 ### Detected Agentic Bots
 
@@ -55,7 +57,7 @@ Both samples ship with the following default bot list (easily configurable):
 
 A single Cloudflare Worker that handles routing, failover, and loop protection.
 
-**File:** [`cloudflare/worker.js`](cloudflare/worker.js)
+**File:** [`cloudflare/automation/src/worker.js`](cloudflare/automation/src/worker.js)
 
 #### Features
 
@@ -193,6 +195,18 @@ See the [Apache BYOCDN guide](https://experienceleague.adobe.com/en/docs/llm-opt
 | `x-edgeoptimize-request` | Internal | Loop/failover protection marker |
 | `x-edgeoptimize-request-id` | ← Edge Optimize | Present when Edge Optimize processed the request |
 | `x-edgeoptimize-fo` | ← Response | Set to `1` when failover to origin occurred |
+
+## Routing tests
+
+Run the dependency-free behavioral tests from the repository root with a Node.js version supporting `vm.SourceTextModule` and native Fetch:
+
+```bash
+node --experimental-vm-modules --test optimize-at-edge/test/routing.test.mjs
+HTTPD=/usr/sbin/httpd HTTPD_MODULE_DIR=/usr/libexec/apache2 \
+  node --test optimize-at-edge/test/apache-routing.test.mjs
+```
+
+Set `HTTPD` and `HTTPD_MODULE_DIR` to your native Apache executable and module directory. The Apache harness runs an isolated child server on loopback with temporary configuration and upstreams; it never changes the system service. It exercises the real routing fragment, not the TLS/ErrorDocument failover replay stack.
 
 ## License
 

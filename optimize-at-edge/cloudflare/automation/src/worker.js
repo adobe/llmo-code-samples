@@ -70,12 +70,15 @@ async function handleRequest(request, env, ctx) {
 
   // Check if user agent is an agentic bot
   const isAgenticBot = AGENTIC_BOTS.some((ua) => userAgent.includes(ua.toLowerCase()));
+  const hasSignatureHeader = !!(request.headers.get('signature-agent')
+    || request.headers.get('signature-input')
+    || request.headers.get('signature'));
 
   // Route to Edge Optimize if:
   // 1. Request is NOT already from Edge Optimize (prevents infinite loops)
-  // 2. User agent matches one of the agentic bots
+  // 2. User agent matches a known bot or a signature header is non-empty
   // 3. Path is targeted for optimization
-  if (!isEdgeOptimizeRequest && isAgenticBot && isTargetedPath) {
+  if (!isEdgeOptimizeRequest && (isAgenticBot || hasSignatureHeader) && isTargetedPath) {
 
     // Build the Edge Optimize request URL
     const edgeOptimizeURL = `https://live.edgeoptimize.net${pathAndQuery}`;
